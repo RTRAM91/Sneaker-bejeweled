@@ -162,14 +162,16 @@
             for (let y = 0; y < GRID_HEIGHT; y++) {
                 gameState.grid[y] = [];
                 for (let x = 0; x < GRID_WIDTH; x++) {
-                    gameState.grid[y][x] = {
-                        type: Math.floor(Math.random() * SNEAKER_TYPES.length),
-                        x: x,
-                        y: y
-                    };
+                    let type;
+                    do {
+                        type = Math.floor(Math.random() * SNEAKER_TYPES.length);
+                    } while (
+                        (x >= 2 && gameState.grid[y][x - 1].type === type && gameState.grid[y][x - 2].type === type) ||
+                        (y >= 2 && gameState.grid[y - 1][x].type === type && gameState.grid[y - 2][x].type === type)
+                    );
+                    gameState.grid[y][x] = { type: type, x: x, y: y };
                 }
             }
-            clearMatches();
         }
 
         function renderGrid() {
@@ -200,7 +202,6 @@
                     const text = scene.add.text(posX, posY, SNEAKER_TYPES[tile.type].emoji,
                         { fontSize: '40px', align: 'center' });
                     text.setOrigin(0.5, 0.5);
-                    text.setPointerEvents(false);
                 }
             }
         }
@@ -222,18 +223,25 @@
 
                 if (dx + dy === 1) {
                     gameState.animating = true;
-                    swapTiles(gameState.selected.x, gameState.selected.y, clickX, clickY);
+                    const prevSel = { x: gameState.selected.x, y: gameState.selected.y };
+                    swapTiles(prevSel.x, prevSel.y, clickX, clickY);
                     gameState.selected = null;
 
-                    scene.time.delayedCall(300, () => {
-                        const found = clearMatches();
-                        if (found) {
-                            gameState.moves++;
-                            updateStats();
+                    renderGrid.call(scene);
+
+                    const swapped = { x1: clickX, y1: clickY };
+                    const first = { x: swapped.x1, y: swapped.y1 };
+
+                    scene.time.delayedCall(250, () => {
+                        if (!findMatches().size) {
+                            // Invalid move: swap back
+                            swapTiles(first.x, first.y, prevSel.x, prevSel.y);
+                            gameState.animating = false;
+                            renderGrid.call(scene);
+                            return;
                         }
-                        applyGravity.call(scene);
-                        gameState.animating = false;
-                        renderGrid.call(scene);
+                        gameState.moves++;
+                        resolveCascade.call(scene);
                     });
                 } else {
                     gameState.selected = { x: clickX, y: clickY };
@@ -248,69 +256,62 @@
             gameState.grid[y2][x2] = temp;
         }
 
-        function clearMatches() {
+        function findMatches() {
             const toRemove = new Set();
-            let found = false;
 
             for (let y = 0; y < GRID_HEIGHT; y++) {
                 for (let x = 0; x < GRID_WIDTH; x++) {
-                    const type = gameState.grid[y][x].type;
+                    const cell = gameState.grid[y][x];
+                    if (!cell) continue;
+                    const type = cell.type;
 
                     let hCount = 1;
-                    for (let i = x + 1; i < GRID_WIDTH; i++) {
-                        if (gameState.grid[y][i].type === type) hCount++;
-                        else break;
+                    while (x + hCount < GRID_WIDTH && gameState.grid[y][x + hCount] && gameState.grid[y][x + hCount].type === type) hCount++;
+                    if (hCount >= 3) {
+                        for (let i = 0; i < hCount; i++) toRemove.add(`${x + i},${y}`);
                     }
 
                     let vCount = 1;
-                    for (let i = y + 1; i < GRID_HEIGHT; i++) {
-                        if (gameState.grid[i][x].type === type) vCount++;
-                        else break;
-                    }
-
-                    if (hCount >= 3) {
-                        found = true;
-                        for (let i = x; i < x + hCount; i++) {
-                            toRemove.add(`${i},${y}`);
-                        }
-                    }
-
+                    while (y + vCount < GRID_HEIGHT && gameState.grid[y + vCount][x] && gameState.grid[y + vCount][x].type === type) vCount++;
                     if (vCount >= 3) {
-                        found = true;
-                        for (let i = y; i < y + vCount; i++) {
-                            toRemove.add(`${x},${i}`);
-                        }
+                        for (let i = 0; i < vCount; i++) toRemove.add(`${x},${y + i}`);
                     }
                 }
             }
+            return toRemove;
+        }
 
-            toRemove.forEach(key => {
+        function resolveCascade() {
+            const scene = this;
+            const matches = findMatches();
+
+            if (!matches.size) {
+                gameState.animating = false;
+                updateStats();
+                renderGrid.call(scene);
+                return;
+            }
+
+            matches.forEach(key => {
                 const [x, y] = key.split(',').map(Number);
                 gameState.score += 10;
                 gameState.grid[y][x] = null;
             });
+            updateStats();
+            renderGrid.call(scene);
 
-            if (found) {
-                compactGrid();
-                clearMatches();
-            }
-
-            return found;
-        }
-
-        function compactGrid() {
-            for (let y = 0; y < GRID_HEIGHT; y++) {
-                gameState.grid[y] = gameState.grid[y].filter(tile => tile !== null);
-            }
+            scene.time.delayedCall(300, () => {
+                applyGravity();
+                renderGrid.call(scene);
+                scene.time.delayedCall(300, () => resolveCascade.call(scene));
+            });
         }
 
         function applyGravity() {
             for (let x = 0; x < GRID_WIDTH; x++) {
                 const column = [];
                 for (let y = 0; y < GRID_HEIGHT; y++) {
-                    if (gameState.grid[y][x]) {
-                        column.push(gameState.grid[y][x]);
-                    }
+                    if (gameState.grid[y][x]) column.push(gameState.grid[y][x]);
                 }
 
                 const empty = GRID_HEIGHT - column.length;
