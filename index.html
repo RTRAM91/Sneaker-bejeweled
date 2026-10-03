@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sneaker Bejeweled</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
+        #gameContainer {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+        #game {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        #stats {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            min-width: 250px;
+            backdrop-filter: blur(10px);
+        }
+        .stat {
+            margin: 20px 0;
+            font-size: 18px;
+        }
+        .stat-label {
+            opacity: 0.8;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .stat-value {
+            font-size: 42px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #ee5a52;
+            transform: translateY(-2px);
+        }
+        .info {
+            font-size: 14px;
+            margin-top: 30px;
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="game"></div>
+        <div id="stats">
+            <h2>Sneaker Bejeweled</h2>
+            <div class="stat">
+                <div class="stat-label">Score</div>
+                <div class="stat-value" id="score">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Moves</div>
+                <div class="stat-value" id="moves">0</div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Level</div>
+                <div class="stat-value" id="level">1</div>
+            </div>
+            <button onclick="location.reload()">New Game</button>
+            <div class="info">
+                <strong>How to Play:</strong>
+                <p>Click two adjacent sneakers to swap them. Match 3 or more of the same sneaker type in a row or column to clear them and score points!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const GRID_WIDTH = 6;
+        const GRID_HEIGHT = 6;
+        const TILE_SIZE = 60;
+        const PADDING = 10;
+
+        const SNEAKER_TYPES = [
+            { id: 0, emoji: '👟', name: 'Black' },
+            { id: 1, emoji: '🟦', name: 'Blue' },
+            { id: 2, emoji: '🟥', name: 'Red' },
+            { id: 3, emoji: '🟨', name: 'Yellow' },
+            { id: 4, emoji: '🟩', name: 'Green' },
+            { id: 5, emoji: '⚪', name: 'White' }
+        ];
+
+        let gameState = {
+            score: 0,
+            moves: 0,
+            level: 1,
+            selected: null,
+            animating: false,
+            grid: []
+        };
+
+        const config = {
+            type: Phaser.AUTO,
+            parent: 'game',
+            width: GRID_WIDTH * (TILE_SIZE + PADDING) + PADDING,
+            height: GRID_HEIGHT * (TILE_SIZE + PADDING) + PADDING,
+            backgroundColor: '#1a1a2e',
+            scene: {
+                create: create,
+                update: update
+            },
+            physics: {
+                default: 'arcade',
+                arcade: { debug: false }
+            }
+        };
+
+        const game = new Phaser.Game(config);
+
+        function create() {
+            this.input.on('pointerdown', handleTileClick, this);
+            initializeGrid();
+            renderGrid.call(this);
+        }
+
+        function update() {}
+
+        function initializeGrid() {
+            gameState.grid = [];
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                gameState.grid[y] = [];
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    gameState.grid[y][x] = {
+                        type: Math.floor(Math.random() * SNEAKER_TYPES.length),
+                        x: x,
+                        y: y
+                    };
+                }
+            }
+            clearMatches();
+        }
+
+        function renderGrid() {
+            const scene = this;
+            if (scene.children) {
+                scene.children.removeAll(true);
+            }
+
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (!gameState.grid[y] || !gameState.grid[y][x]) continue;
+
+                    const tile = gameState.grid[y][x];
+                    const posX = PADDING + x * (TILE_SIZE + PADDING) + TILE_SIZE / 2;
+                    const posY = PADDING + y * (TILE_SIZE + PADDING) + TILE_SIZE / 2;
+
+                    const isSelected = gameState.selected &&
+                        gameState.selected.x === x &&
+                        gameState.selected.y === y;
+
+                    const rect = scene.add.rectangle(posX, posY, TILE_SIZE, TILE_SIZE,
+                        isSelected ? 0xffdd00 : 0x333333);
+                    rect.setStrokeStyle(isSelected ? 3 : 2, isSelected ? 0xffff00 : 0x666666);
+                    rect.setInteractive();
+                    rect.tileX = x;
+                    rect.tileY = y;
+
+                    const text = scene.add.text(posX, posY, SNEAKER_TYPES[tile.type].emoji,
+                        { fontSize: '40px', align: 'center' });
+                    text.setOrigin(0.5, 0.5);
+                    text.setPointerEvents(false);
+                }
+            }
+        }
+
+        function handleTileClick(pointer) {
+            const scene = this;
+            const clickX = Math.floor((pointer.x - PADDING) / (TILE_SIZE + PADDING));
+            const clickY = Math.floor((pointer.y - PADDING) / (TILE_SIZE + PADDING));
+
+            if (clickX < 0 || clickX >= GRID_WIDTH || clickY < 0 || clickY >= GRID_HEIGHT) return;
+            if (gameState.animating) return;
+
+            if (!gameState.selected) {
+                gameState.selected = { x: clickX, y: clickY };
+                renderGrid.call(scene);
+            } else {
+                const dx = Math.abs(gameState.selected.x - clickX);
+                const dy = Math.abs(gameState.selected.y - clickY);
+
+                if (dx + dy === 1) {
+                    gameState.animating = true;
+                    swapTiles(gameState.selected.x, gameState.selected.y, clickX, clickY);
+                    gameState.selected = null;
+
+                    scene.time.delayedCall(300, () => {
+                        const found = clearMatches();
+                        if (found) {
+                            gameState.moves++;
+                            updateStats();
+                        }
+                        applyGravity.call(scene);
+                        gameState.animating = false;
+                        renderGrid.call(scene);
+                    });
+                } else {
+                    gameState.selected = { x: clickX, y: clickY };
+                    renderGrid.call(scene);
+                }
+            }
+        }
+
+        function swapTiles(x1, y1, x2, y2) {
+            const temp = gameState.grid[y1][x1];
+            gameState.grid[y1][x1] = gameState.grid[y2][x2];
+            gameState.grid[y2][x2] = temp;
+        }
+
+        function clearMatches() {
+            const toRemove = new Set();
+            let found = false;
+
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const type = gameState.grid[y][x].type;
+
+                    let hCount = 1;
+                    for (let i = x + 1; i < GRID_WIDTH; i++) {
+                        if (gameState.grid[y][i].type === type) hCount++;
+                        else break;
+                    }
+
+                    let vCount = 1;
+                    for (let i = y + 1; i < GRID_HEIGHT; i++) {
+                        if (gameState.grid[i][x].type === type) vCount++;
+                        else break;
+                    }
+
+                    if (hCount >= 3) {
+                        found = true;
+                        for (let i = x; i < x + hCount; i++) {
+                            toRemove.add(`${i},${y}`);
+                        }
+                    }
+
+                    if (vCount >= 3) {
+                        found = true;
+                        for (let i = y; i < y + vCount; i++) {
+                            toRemove.add(`${x},${i}`);
+                        }
+                    }
+                }
+            }
+
+            toRemove.forEach(key => {
+                const [x, y] = key.split(',').map(Number);
+                gameState.score += 10;
+                gameState.grid[y][x] = null;
+            });
+
+            if (found) {
+                compactGrid();
+                clearMatches();
+            }
+
+            return found;
+        }
+
+        function compactGrid() {
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                gameState.grid[y] = gameState.grid[y].filter(tile => tile !== null);
+            }
+        }
+
+        function applyGravity() {
+            for (let x = 0; x < GRID_WIDTH; x++) {
+                const column = [];
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    if (gameState.grid[y][x]) {
+                        column.push(gameState.grid[y][x]);
+                    }
+                }
+
+                const empty = GRID_HEIGHT - column.length;
+                for (let y = 0; y < GRID_HEIGHT; y++) {
+                    if (y < empty) {
+                        gameState.grid[y][x] = {
+                            type: Math.floor(Math.random() * SNEAKER_TYPES.length),
+                            x: x,
+                            y: y
+                        };
+                    } else {
+                        gameState.grid[y][x] = column[y - empty];
+                        gameState.grid[y][x].y = y;
+                    }
+                }
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('moves').textContent = gameState.moves;
+            document.getElementById('level').textContent = Math.floor(gameState.score / 100) + 1;
+        }
+
+        updateStats();
+    </script>
+</body>
+</html>
