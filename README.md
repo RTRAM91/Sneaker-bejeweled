@@ -1,63 +1,20 @@
-# Sneaker Bejeweled 👟
+# Sneaker Bejeweled
 
-A fun twist on the classic Bejeweled match-3 game featuring sneakers instead of gems!
+A 60-second match-three game. Swap neighboring sneakers to line up three or more of the same color.
 
-## Features
+## Play
 
-- **6x6 Game Grid** - Classic match-3 gameplay
-- **Swap Mechanics** - Click two adjacent sneakers to swap them
-- **Match Detection** - Automatically detects matches of 3 or more
-- **Cascading Matches** - Matches trigger gravity, creating chain reactions
-- **Scoring System** - Earn 10 points per sneaker cleared
-- **Level Progression** - Level increases every 100 points
-- **Move Counter** - Track your moves
+Open `index.html` in any browser. No build step and no dependencies.
 
-## How to Play
+## Rules
 
-1. **Open** `index.html` in your web browser
-2. **Click** two adjacent sneaker tiles to swap them
-3. **Match** 3 or more of the same sneaker type in a row or column
-4. **Clear** matched sneakers to score points and trigger cascades
-5. **Progress** through levels by earning points
+- Six sneaker colors: red, blue, yellow, green, purple, pink.
+- Click two neighbors, or drag a sneaker toward a neighbor, to swap. A swap that makes no match swaps back.
+- Each cleared sneaker scores 10, multiplied by the cascade chain.
+- The game lasts 60 seconds. Your best score is saved in the browser.
 
-## Game Rules
+## Special items
 
-- Sneakers fall downward when tiles below them are cleared (gravity)
-- Clearing a group triggers cascades, which can create chain reactions
-- Each move counts toward your total moves
-- Score increases by 10 points per sneaker cleared
-- Level 1 starts at 0 points, increases every 100 points
-
-## Sneaker Types
-
-- 👟 Black Sneaker
-- 🟦 Blue
-- 🟥 Red  
-- 🟨 Yellow
-- 🟩 Green
-- ⚪ White
-
-## Technologies
-
-- **Phaser 3** - Game framework
-- **HTML5 Canvas** - Rendering
-- **Vanilla JavaScript** - Game logic
-
-## Installation & Running
-
-No installation needed! Just open `index.html` in any modern web browser.
-
-## Game Loop
-
-The game follows this sequence:
-1. User selects first tile
-2. User selects adjacent tile to swap
-3. Tiles swap positions
-4. Check for matches (3+ in a row/column)
-5. Remove matched tiles and increase score
-6. Apply gravity (tiles fall down)
-7. Repeat match checking until no more matches found
-8. Refill empty spaces with new random sneakers
-9. Return to step 1
-
-Enjoy your sneaker matching adventure! 🎮
+- **Cap Bomb**: made by matching 4 in a row. Swap it with any neighbor to blast a diamond of sneakers around it.
+- **Basketball**: made by matching 5 in a row. Swap it to clear its whole row and column and freeze the clock for 5 seconds (up to 10 seconds banked).
+- Both can also drop in on their own, up to 3 on the board at once. A blast that hits another special sets it off too.
